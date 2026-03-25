@@ -1,0 +1,6 @@
+streamlit
+yfinance
+ta
+plotly
+openpyxl
+xlrd
