@@ -10,6 +10,31 @@ st.set_page_config(page_title="株式売買判断ツール", layout="wide")
 st.title("📈 株式売買判断ツール")
 st.caption("日本の個別株のテクニカル指標をチェックして、買い時かどうかを判断します")
 
+# --- スマホ向けスタイル調整 ---
+st.markdown("""
+<style>
+    /* 全体の余白を詰める */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0rem;
+    }
+    /* 見出しサイズを調整 */
+    h1 { font-size: 1.5rem !important; }
+    h2 { font-size: 1.2rem !important; }
+    h3 { font-size: 1.0rem !important; }
+    /* メトリクスのサイズ調整 */
+    [data-testid="stMetricValue"] {
+        font-size: 1.2rem !important;
+    }
+    /* サイドバーの幅を調整 */
+    @media (max-width: 768px) {
+        h1 { font-size: 1.3rem !important; }
+        h2 { font-size: 1.1rem !important; }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 # --- 東証銘柄リストの取得（キャッシュで高速化） ---
 @st.cache_data(ttl=86400)
 def load_stock_list():
@@ -326,7 +351,7 @@ if ticker_code:
         )
         
         fig.update_layout(
-            height=900,
+            height=600,
             xaxis_rangeslider_visible=False,
             showlegend=True,
             margin=dict(l=10, r=10, t=30, b=10),
