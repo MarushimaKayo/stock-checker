@@ -333,78 +333,74 @@ if ticker_code:
             """)
 
 
-# --- 想定購入価格による順張り判断 ---
-st.markdown("---")
-st.subheader("🎯 想定購入価格チェック")
-buy_price = st.number_input(
-    "購入を検討している価格を入力（例：当日の気配値など）",
-    min_value=0.0,
-    value=0.0,
-    step=1.0,
-    format="%.0f"
-)
-
-if buy_price > 0:
-    price_diff = buy_price - current_price
-    price_change_pct = (price_diff / current_price) * 100
-
-    # 出来高判定（直近の出来高が20日平均の1.5倍以上か）
-    vol_avg_20 = df["Volume"].tail(20).mean()
-    latest_vol = df["Volume"].iloc[-1]
-    high_volume = latest_vol >= vol_avg_20 * 1.5
-
-    # 損切りラインを入力価格ベースで再計算
-    stop_loss_from_buy = buy_price - (atr_value * 2)
-
-    st.markdown(f"**前日終値との差：** {price_diff:+,.0f}円（{price_change_pct:+.1f}%）")
-    st.markdown(f"**入力価格ベースの損切り目安：** ¥{stop_loss_from_buy:,.0f}")
-
-    # 判断ロジック
-    threshold = 3.0  # 急騰とみなす基準（%）
-
-    if abs(price_change_pct) < threshold:
-        # 変動が小さい → シグナル通りでOK
-        st.success(
-            f"✅ 前日比 {price_change_pct:+.1f}% — 大きな変動なし。"
-            f"上記のシグナル判定をそのまま参考にしてエントリーできます。"
+        # --- 想定購入価格による順張り判断 ---
+        st.markdown("---")
+        st.subheader("🎯 想定購入価格チェック")
+        buy_price = st.number_input(
+            "購入を検討している価格を入力（例：当日の気配値など）",
+            min_value=0.0,
+            value=0.0,
+            step=1.0,
+            format="%.0f"
         )
-    elif price_change_pct >= threshold and high_volume:
-        # 急騰 + 出来高あり → 実体ある上昇
-        st.info(
-            f"📈 前日比 {price_change_pct:+.1f}%（上昇）＋ 出来高増加あり。\n\n"
-            f"出来高を伴った上昇のため、トレンド継続の可能性があります。"
-            f"順張りエントリーは検討可。ただし損切りライン ¥{stop_loss_from_buy:,.0f} を必ず設定してください。"
-        )
-    elif price_change_pct >= threshold and not high_volume:
-        # 急騰 + 出来高なし → ダマシの可能性
-        st.warning(
-            f"⚠️ 前日比 {price_change_pct:+.1f}%（上昇）だが、出来高が伴っていません。\n\n"
-            f"実体のない急騰（ダマシ）の可能性があります。"
-            f"見送りまたは押し目を待つことを推奨します。"
-        )
-    elif price_change_pct <= -threshold:
-        # 急落
-        st.error(
-            f"🔻 前日比 {price_change_pct:+.1f}%（下落）。\n\n"
-            f"大きく下落しています。落ちるナイフを掴まないよう、"
-            f"反発を確認してからのエントリーを推奨します。"
-        )
+
+        if buy_price > 0:
+            price_diff = buy_price - current_price
+            price_change_pct = (price_diff / current_price) * 100
+
+            # 出来高判定（直近の出来高が20日平均の1.5倍以上か）
+            vol_avg_20 = df["Volume"].tail(20).mean()
+            latest_vol = df["Volume"].iloc[-1]
+            high_volume = latest_vol >= vol_avg_20 * 1.5
+
+            # 損切りラインを入力価格ベースで再計算
+            stop_loss_from_buy = buy_price - (atr_value * 2)
+
+            st.markdown(f"**前日終値との差：** {price_diff:+,.0f}円（{price_change_pct:+.1f}%）")
+            st.markdown(f"**入力価格ベースの損切り目安：** ¥{stop_loss_from_buy:,.0f}")
+
+            # 判断ロジック
+            threshold = 3.0  # 急騰とみなす基準（%）
+
+            if abs(price_change_pct) < threshold:
+                st.success(
+                    f"✅ 前日比 {price_change_pct:+.1f}% — 大きな変動なし。"
+                    f"上記のシグナル判定をそのまま参考にしてエントリーできます。"
+                )
+            elif price_change_pct >= threshold and high_volume:
+                st.info(
+                    f"📈 前日比 {price_change_pct:+.1f}%（上昇）＋ 出来高増加あり。\n\n"
+                    f"出来高を伴った上昇のため、トレンド継続の可能性があります。"
+                    f"順張りエントリーは検討可。ただし損切りライン ¥{stop_loss_from_buy:,.0f} を必ず設定してください。"
+                )
+            elif price_change_pct >= threshold and not high_volume:
+                st.warning(
+                    f"⚠️ 前日比 {price_change_pct:+.1f}%（上昇）だが、出来高が伴っていません。\n\n"
+                    f"実体のない急騰（ダマシ）の可能性があります。"
+                    f"見送りまたは押し目を待つことを推奨します。"
+                )
+            elif price_change_pct <= -threshold:
+                st.error(
+                    f"🔻 前日比 {price_change_pct:+.1f}%（下落）。\n\n"
+                    f"大きく下落しています。落ちるナイフを掴まないよう、"
+                    f"反発を確認してからのエントリーを推奨します。"
+                )
 
         # 判定根拠
         st.subheader("📊 判定の根拠")
         for reason in reasons:
             st.write(reason)
-        
+
         # --- チャート ---
         st.subheader("📈 チャート")
-        
+
         fig = make_subplots(
             rows=4, cols=1, shared_xaxes=True,
             vertical_spacing=0.05,
             row_heights=[0.4, 0.2, 0.2, 0.2],
             subplot_titles=("株価チャート", "MACD", "RSI", "出来高"),
         )
-        
+
         # ローソク足
         fig.add_trace(
             go.Candlestick(
@@ -425,7 +421,7 @@ if buy_price > 0:
             annotation_text=f"損切り目安 ¥{stop_loss:,.0f}",
             row=1, col=1,
         )
-        
+
         # MACD
         fig.add_trace(
             go.Scatter(x=df.index, y=df["MACD"], name="MACD", line=dict(color="blue")),
@@ -439,7 +435,7 @@ if buy_price > 0:
             go.Bar(x=df.index, y=df["MACD_hist"], name="Histogram"),
             row=2, col=1,
         )
-        
+
         # RSI
         fig.add_trace(
             go.Scatter(x=df.index, y=df["RSI"], name="RSI", line=dict(color="purple")),
@@ -447,20 +443,20 @@ if buy_price > 0:
         )
         fig.add_hline(y=70, line_dash="dash", line_color="red", row=3, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color="green", row=3, col=1)
-        
+
         # 出来高
         fig.add_trace(
             go.Bar(x=df.index, y=df["Volume"], name="出来高"),
             row=4, col=1,
         )
-        
+
         fig.update_layout(
             height=600,
             xaxis_rangeslider_visible=False,
             showlegend=True,
             margin=dict(l=10, r=10, t=30, b=10),
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("👈 左のメニューから銘柄を入力してください")
