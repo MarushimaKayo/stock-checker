@@ -47,12 +47,14 @@ def load_stock_list():
 
 try:
     stock_list_df = load_stock_list()
+    stock_list_loaded = True
 except Exception as e:
     st.error(
         "⚠️ 東証の銘柄リストの取得に失敗しました。\n\n"
         "JPX（日本取引所）のサーバーに接続できない可能性があります。"
         "しばらく待ってからページを再読み込みしてください。"
     )
+    stock_list_loaded = False
     st.stop()
 
 # --- 入力エリア ---
