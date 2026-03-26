@@ -15,7 +15,7 @@ st.markdown("""
 <style>
     /* 全体の余白を調整 */
     .block-container {
-        padding-top: 2rem;
+        padding-top: 3rem;
         padding-bottom: 0rem;
     }
     /* 見出しサイズを調整（h1はタイトルなので少し大きめに残す） */
