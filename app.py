@@ -47,10 +47,13 @@ def load_stock_list():
 
 try:
     stock_list_df = load_stock_list()
-    stock_list_loaded = True
 except Exception as e:
-    stock_list_loaded = False
-    st.sidebar.warning("銘柄リストの取得に失敗しました。証券コードで入力してください。")
+    st.error(
+        "⚠️ 東証の銘柄リストの取得に失敗しました。\n\n"
+        "JPX（日本取引所）のサーバーに接続できない可能性があります。"
+        "しばらく待ってからページを再読み込みしてください。"
+    )
+    st.stop()
 
 # --- 入力エリア ---
 st.sidebar.header("🔍 銘柄を入力")
@@ -123,43 +126,52 @@ if ticker_code:
     symbol = f"{ticker_code}.T"
     
     with st.spinner("データを取得中..."):
-        df = yf.download(symbol, period="6mo", interval="1d")
-    
-    if df.empty:
-        st.error("データを取得できませんでした。証券コードを確認してください。")
-    else:
+        try:
+            df = yf.download(symbol, period="6mo", interval="1d")
+            if df is None or df.empty:
+                st.error(f"⚠️ {company_name}（{ticker_code}）の株価データが見つかりませんでした。証券コードを確認してください。")
+                st.stop()
+        except Exception as e:
+            st.error(
+                "⚠️ 株価データの取得に失敗しました。\n\n"
+                "Yahoo Finance への接続に問題がある可能性があります。"
+                "しばらく待ってからもう一度お試しください。"
+            )
+            st.stop()
+
         # MultiIndex対応
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        
+
         # --- テクニカル指標の計算 ---
         # 移動平均線
         df["MA5"] = ta.trend.sma_indicator(df["Close"], window=5)
         df["MA25"] = ta.trend.sma_indicator(df["Close"], window=25)
         df["MA75"] = ta.trend.sma_indicator(df["Close"], window=75)
-        
+
         # MACD
         macd = ta.trend.MACD(df["Close"])
         df["MACD"] = macd.macd()
         df["MACD_signal"] = macd.macd_signal()
         df["MACD_hist"] = macd.macd_diff()
-        
+
         # RSI
         df["RSI"] = ta.momentum.rsi(df["Close"], window=14)
-        
+
         # ATR（損切り目安用）
         df["ATR"] = ta.volatility.average_true_range(
             df["High"], df["Low"], df["Close"], window=14
         )
-        
+
         # 最新データ
         latest = df.iloc[-1]
         prev = df.iloc[-2]
         current_price = latest["Close"]
-        
+
         # --- 判定ロジック ---
         signals = []
         reasons = []
+
         
         # 1. 移動平均線の判定
         if latest["MA5"] > latest["MA25"]:
@@ -318,6 +330,63 @@ if ticker_code:
 - 銘柄の値動きの大きさに応じて自動調整されます
             """)
 
+
+# --- 想定購入価格による順張り判断 ---
+st.markdown("---")
+st.subheader("🎯 想定購入価格チェック")
+buy_price = st.number_input(
+    "購入を検討している価格を入力（例：当日の気配値など）",
+    min_value=0.0,
+    value=0.0,
+    step=1.0,
+    format="%.0f"
+)
+
+if buy_price > 0:
+    price_diff = buy_price - current_price
+    price_change_pct = (price_diff / current_price) * 100
+
+    # 出来高判定（直近の出来高が20日平均の1.5倍以上か）
+    vol_avg_20 = df["Volume"].tail(20).mean()
+    latest_vol = df["Volume"].iloc[-1]
+    high_volume = latest_vol >= vol_avg_20 * 1.5
+
+    # 損切りラインを入力価格ベースで再計算
+    stop_loss_from_buy = buy_price - (atr_value * 2)
+
+    st.markdown(f"**前日終値との差：** {price_diff:+,.0f}円（{price_change_pct:+.1f}%）")
+    st.markdown(f"**入力価格ベースの損切り目安：** ¥{stop_loss_from_buy:,.0f}")
+
+    # 判断ロジック
+    threshold = 3.0  # 急騰とみなす基準（%）
+
+    if abs(price_change_pct) < threshold:
+        # 変動が小さい → シグナル通りでOK
+        st.success(
+            f"✅ 前日比 {price_change_pct:+.1f}% — 大きな変動なし。"
+            f"上記のシグナル判定をそのまま参考にしてエントリーできます。"
+        )
+    elif price_change_pct >= threshold and high_volume:
+        # 急騰 + 出来高あり → 実体ある上昇
+        st.info(
+            f"📈 前日比 {price_change_pct:+.1f}%（上昇）＋ 出来高増加あり。\n\n"
+            f"出来高を伴った上昇のため、トレンド継続の可能性があります。"
+            f"順張りエントリーは検討可。ただし損切りライン ¥{stop_loss_from_buy:,.0f} を必ず設定してください。"
+        )
+    elif price_change_pct >= threshold and not high_volume:
+        # 急騰 + 出来高なし → ダマシの可能性
+        st.warning(
+            f"⚠️ 前日比 {price_change_pct:+.1f}%（上昇）だが、出来高が伴っていません。\n\n"
+            f"実体のない急騰（ダマシ）の可能性があります。"
+            f"見送りまたは押し目を待つことを推奨します。"
+        )
+    elif price_change_pct <= -threshold:
+        # 急落
+        st.error(
+            f"🔻 前日比 {price_change_pct:+.1f}%（下落）。\n\n"
+            f"大きく下落しています。落ちるナイフを掴まないよう、"
+            f"反発を確認してからのエントリーを推奨します。"
+        )
 
         # 判定根拠
         st.subheader("📊 判定の根拠")
