@@ -75,13 +75,22 @@ def to_fullwidth(text):
 if input_method == "会社名で検索":
     search_text = st.sidebar.text_input("会社名を入力（例：ソフトバンク、東急、SBI）")
     if search_text and stock_list_loaded:
-        # 半角・全角両方で検索
+                # 半角・全角両方で検索
         search_full = to_fullwidth(search_text)
         matches = stock_list_df[
             stock_list_df["銘柄名"].str.contains(search_text, case=False, na=False) |
             stock_list_df["銘柄名"].str.contains(search_full, case=False, na=False)
-        ]
+        ].copy()
         if not matches.empty:
+            # 完全一致 → 前方一致 → 名前が短い順 で並べる
+            matches["_exact"] = matches["銘柄名"].apply(
+                lambda x: 0 if x == search_text or x == search_full else 1
+            )
+            matches["_starts"] = matches["銘柄名"].apply(
+                lambda x: 0 if x.startswith(search_text) or x.startswith(search_full) else 1
+            )
+            matches["_len"] = matches["銘柄名"].str.len()
+            matches = matches.sort_values(["_exact", "_starts", "_len"])
             options = {f"{row['銘柄名']}（{row['コード']}）": row for _, row in matches.head(20).iterrows()}
             selected = st.sidebar.selectbox("候補を選択", list(options.keys()))
             ticker_code = options[selected]["コード"]
